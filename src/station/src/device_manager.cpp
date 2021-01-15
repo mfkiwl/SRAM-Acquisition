@@ -82,14 +82,15 @@ DeviceManager::device_map ()
 
 /// Send a header to all ports in a blocking way
 /// TODO: Add error handling
+/// @param buf buffer to send
+/// @param len number of bytes to send
 void
-DeviceManager::broadcast_blocking (const char *buf, const int &len)
+DeviceManager::broadcast_blocking (const uint8_t *buf, const int &len)
 {
-      for (auto [port_name, port] : this->ports)
-        {
-          port->write_some (asio::buffer (buf, len));
-        }
-
+  for (auto [port_name, port] : this->ports)
+    {
+      port->write_some (asio::buffer (buf, len));
+    }
 }
 
 /// Listen for headers in every port in a blocking way
@@ -97,6 +98,7 @@ DeviceManager::broadcast_blocking (const char *buf, const int &len)
 /// The number of devices in each port has to be supplied and has to be the
 /// same In future implementations this communication will be async and the
 /// number of devices will be dynamic
+/// @param num_devices number of headers to read
 std::vector<std::pair<std::string, header_t> >
 DeviceManager::listen_headers_block (const int num_devices)
 {
@@ -161,7 +163,7 @@ DeviceManager::register_devices ()
     .bid_low = 0,
   };
 
-  auto header_ser = new char[sizeof (header_t)];
+  auto header_ser = new uint8_t[sizeof (header_t)];
   memcpy (header_ser, &ping_header, sizeof (header_t));
   this->broadcast_blocking (header_ser, sizeof (header_t));
   delete header_ser;

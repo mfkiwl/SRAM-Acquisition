@@ -4,8 +4,8 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <served/served.hpp>
 
-#include "include/station.hpp"
 #include "include/db_manager.hpp"
+#include "include/station.hpp"
 
 using namespace std::chrono_literals;
 namespace bpt = boost::property_tree;
@@ -100,7 +100,7 @@ Station::run (const std::string &host, const std::string &port)
   mux.handle ("/devices/poweron")
       .get ([this] (served::response &res, const served::request &) {
         this->dev_manager.power_on ();
-        this->logger.log_power_cycle("on");
+        this->logger.log_power_cycle ("on");
 
         bpt::ptree root;
         std::stringstream ss;
@@ -109,13 +109,13 @@ Station::run (const std::string &host, const std::string &port)
 
         res.set_status (200);
 
-        res << ss.str();
+        res << ss.str ();
       });
 
   mux.handle ("/devices/poweroff")
       .get ([this] (served::response &res, const served::request &) {
         this->dev_manager.power_off ();
-        this->logger.log_power_cycle("off");
+        this->logger.log_power_cycle ("off");
 
         bpt::ptree root;
         std::stringstream ss;
@@ -124,7 +124,7 @@ Station::run (const std::string &host, const std::string &port)
 
         res.set_status (200);
 
-        res << ss.str();
+        res << ss.str ();
       });
 
   mux.handle ("/commands/read")
@@ -163,7 +163,7 @@ Station::run (const std::string &host, const std::string &port)
           .bid_medium = bid_medium,
           .bid_low = bid_low,
         };
-        auto ser_header = new char[sizeof (header_t)];
+        auto ser_header = new uint8_t[sizeof (header_t)];
         memcpy (ser_header, &read_header, sizeof (header_t));
 
         // Send READ header
@@ -179,7 +179,7 @@ Station::run (const std::string &host, const std::string &port)
                              .mem_address = mem_address,
                              .data = { 0 } };
 
-        auto ser_body = new char[sizeof (body_t)];
+        auto ser_body = new uint8_t[sizeof (body_t)];
         memcpy (ser_body, &read_body, sizeof (body_t));
 
         // Send READ body
@@ -187,7 +187,8 @@ Station::run (const std::string &host, const std::string &port)
         // ACK from READ received
         auto ack_body = this->dev_manager.listen_body_block (port_name);
 
-        this->logger.log_mem_read (board_id, fmt::format("0x{:08x}", mem_address));
+        this->logger.log_mem_read (board_id,
+                                   fmt::format ("0x{:08x}", mem_address));
 
         delete ser_header;
         delete ser_body;
@@ -209,7 +210,7 @@ Station::run (const std::string &host, const std::string &port)
         std::stringstream ss;
 
         root.put ("board_id", board_id);
-        root.put ("mem_address", fmt::format ("0x{:08x}", mem_address) );
+        root.put ("mem_address", fmt::format ("0x{:08x}", mem_address));
         root.put ("message", "region of memory read");
 
         bpt::ptree data_arr;
@@ -265,7 +266,7 @@ Station::run (const std::string &host, const std::string &port)
           .bid_medium = bid_medium,
           .bid_low = bid_low,
         };
-        auto ser_header = new char[sizeof (header_t)];
+        auto ser_header = new uint8_t[sizeof (header_t)];
         memcpy (ser_header, &write_header, sizeof (header_t));
 
         // Send WRITE header
@@ -274,39 +275,35 @@ Station::run (const std::string &host, const std::string &port)
         this->dev_manager.listen_headers_block (1);
 
         body_t write_body = { .type = (uint8_t)body_type::MEMORY,
-                             .CRC = 0x50,
-                             .bid_high = bid_high,
-                             .bid_medium = bid_medium,
-                             .bid_low = bid_low,
-                             .mem_address = mem_address,
-                             .data = { 0 }
-        };
+                              .CRC = 0x50,
+                              .bid_high = bid_high,
+                              .bid_medium = bid_medium,
+                              .bid_low = bid_low,
+                              .mem_address = mem_address,
+                              .data = { 0 } };
 
         // TODO: Error when no array is found
-        std::vector<uint8_t> bytes = this->db_manager.get_data_vector(board_id, fmt::format("0x{:08x}", mem_address));
-        std::vector<uint8_t> inverted_bytes = invert_bytes_arr(bytes);
-        /*
-        std::vector<uint8_t> values = bytes_to_bitarr (bytes);
-        std::vector<uint8_t> inverted_bits = invert_bit_arr (values);
-        std::vector<uint8_t> inverted_bytes = bitarr_to_bytes (inverted_bits);*/
+        std::vector<uint8_t> bytes = this->db_manager.get_data_vector (
+            board_id, fmt::format ("0x{:08x}", mem_address));
+        std::vector<uint8_t> inverted_bytes = invert_bytes_arr (bytes);
 
-        for(int b = 0; b < 512; ++b) {
-                write_body.data[b] = inverted_bytes[b];
-        }
+        for (int b = 0; b < 512; ++b)
+          {
+            write_body.data[b] = inverted_bytes[b];
+          }
 
-        auto ser_body = new char[sizeof (body_t)];
+        auto ser_body = new uint8_t[sizeof (body_t)];
         memcpy (ser_body, &write_body, sizeof (body_t));
 
         // Send WRITE body
         std::cout << "SEND WRITE BODY\n";
         this->dev_manager.broadcast_blocking (ser_body, sizeof (body_t));
 
-        this->logger.log_mem_write (board_id, fmt::format("0x{:08x}", mem_address));
+        this->logger.log_mem_write (board_id,
+                                    fmt::format ("0x{:08x}", mem_address));
 
         delete ser_header;
-        std::cout << "Deleted ser_header\n";
         delete ser_body;
-        std::cout << "Deleted ser_body\n";
 
         bpt::ptree root;
         std::stringstream ss;

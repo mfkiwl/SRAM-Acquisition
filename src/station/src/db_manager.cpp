@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <string>
 
 #include "include/db_manager.hpp"
@@ -9,17 +10,15 @@ using bsoncxx::builder::basic::make_array;
 using bsoncxx::builder::basic::make_document;
 using bsoncxx::builder::basic::sub_array;
 
-std::map<uint8_t, std::string> packet_name =
-{
-  {(uint8_t)header_type::ACK, "ACK" },
-  {(uint8_t)header_type::PING, "PING" },
-  {(uint8_t)header_type::READ, "READ" },
-  {(uint8_t)header_type::WRITE, "WRITE" },
-  {(uint8_t)header_type::EXEC, "EXEC" },
-  {(uint8_t)body_type::MEMORY, "MEMORY" },
-  {(uint8_t)body_type::SENSORS, "SENSORS" },
-  {(uint8_t)body_type::CODE, "CODE" }
-};
+std::map<uint8_t, std::string> packet_name
+    = { { (uint8_t)header_type::ACK, "ACK" },
+        { (uint8_t)header_type::PING, "PING" },
+        { (uint8_t)header_type::READ, "READ" },
+        { (uint8_t)header_type::WRITE, "WRITE" },
+        { (uint8_t)header_type::EXEC, "EXEC" },
+        { (uint8_t)body_type::MEMORY, "MEMORY" },
+        { (uint8_t)body_type::SENSORS, "SENSORS" },
+        { (uint8_t)body_type::CODE, "CODE" } };
 
 /// Default constructor
 /// TODO: Read config values from file
@@ -40,71 +39,19 @@ DBManager::DBManager (const std::string &uri, const std::string &db_name)
 
 /// mongocxx::client does not provide a way to close the connection directly.
 
-/// Convert a byte array into a bit array
 std::vector<uint8_t>
-bytes_to_bitarr (std::vector<uint8_t> &bytes)
+invert_bytes_arr (std::vector<uint8_t> &bytes)
 {
-  std::vector<uint8_t> bit_arr (bytes.size() * 8);
-
-  for (size_t byte = 0; byte < bytes.size(); ++byte)
-    {
-      for (int bit = 0; bit < 8; ++bit)
-        {
-          bit_arr.push_back ((bytes[byte] >> bit) & 0x01);
-        }
-    }
-
-  return bit_arr;
-}
-
-/// Convert a bit array into a byte array
-std::vector<uint8_t>
-bitarr_to_bytes (const std::vector<uint8_t> &bit_arr)
-{
-  std::vector<uint8_t> bytes(512);
-  int num_bytes = bit_arr.size () / 8;
-
-  for (int byte = 0; byte < num_bytes; ++byte) // 0 - 512
-    {
-      for (int bit = 0; bit < 8; ++bit)
-        {
-          bytes[byte] |= bit_arr[(8 * byte) + bit] & 1;
-          bytes[byte] = bytes[byte] << 1;
-        }
-    }
-
-    return bytes;
-}
-
-// Invert the values in a bit array
-std::vector<uint8_t>
-invert_bit_arr (const std::vector<uint8_t> &bit_arr)
-{
-  std::vector<uint8_t> inversed (bit_arr);
-  for (size_t b = 0; b < inversed.size (); ++b)
-    {
-      if (inversed[b] == 0)
-        inversed[b] = 1;
-      else
-        inversed[b] = 0;
-      //                 inversed[b] = !inversed[b];
-    }
-  return inversed;
-}
-
-std::vector<uint8_t>
-invert_bytes_arr(std::vector<uint8_t> &bytes)
-{
-  std::vector<uint8_t> inverted(bytes.size());
+  std::vector<uint8_t> inverted (bytes.size ());
   for (size_t b = 0; b < bytes.size (); ++b)
     {
-            inverted[b] = bytes[b] ^ 0xFF;
+      inverted[b] = bytes[b] ^ 0xFF;
     }
   return inverted;
 }
 
 /// Convert a header into a document
-/// Every header
+/// Every header has the same size
 bson_doc
 DBManager::header_to_doc (const header_t &header)
 {
@@ -126,6 +73,7 @@ DBManager::header_to_doc (const header_t &header)
 }
 
 /// Convert a body into a document
+/// The data gets converted into a string with comma separated values
 bson_doc
 DBManager::body_to_doc (const body_t &body)
 {
@@ -143,15 +91,13 @@ DBManager::body_to_doc (const body_t &body)
   doc.append (kvp ("creation_time", date));
   doc.append (kvp ("mem_address", fmt::format ("0x{:08x}", body.mem_address)));
 
-  // Convert the bytes into bits
-//   auto bit_arr = bytes_to_bitarr (body.data);
+  std::stringstream data_ss;
 
-  doc.append (kvp ("data", [&body] (sub_array child) {
-    for (const auto &byte : body.data)
-      {
-        child.append (byte);
-      }
-  }));
+  for (int byte = 0; byte < 511; ++byte)
+    data_ss << byte << ",";
+  data_ss << body.data[512];
+
+  doc.append (kvp ("data", data_ss.str ()));
 
   return doc;
 }
@@ -179,22 +125,30 @@ DBManager::reference_present (const std::string &board_id,
   return std::distance (cursor.begin (), cursor.end ()) > 0;
 }
 
+/// Obtain the data from a sample in a vector
+/// As the data is stored in a comma separated string to preserve space,
+/// we need to convert it into a number vector
 std::vector<uint8_t>
-DBManager::get_data_vector(const std::string &board_id, const std::string &mem_address)
+DBManager::get_data_vector (const std::string &board_id,
+                            const std::string &mem_address)
 {
-        std::vector<uint8_t> values;
+  std::vector<uint8_t> values;
 
-        auto cursor = this->db["references"].find (make_document (
-                kvp ("board_id", board_id), kvp ("mem_address", mem_address)));
+  auto cursor = this->db["references"].find (make_document (
+      kvp ("board_id", board_id), kvp ("mem_address", mem_address)));
 
-        for (auto &doc : cursor) {
-          bsoncxx::document::element ele = doc["data"];
-          if (ele.type() == type::k_array) {
-                bsoncxx::array::view subarray{ele.get_array().value};
-                for (const bsoncxx::array::element& b : subarray) {
-                        values.push_back(b.get_int32().value);
-                }
-          }
+  for (auto &doc : cursor)
+    {
+      bsoncxx::document::element ele = doc["data"];
+      std::string data_str = ele.get_utf8 ().value.to_string ();
+      std::vector<std::string> split_bytes;
+
+      std::stringstream ss (data_str);
+      std::string item;
+      while (std::getline (ss, item, ','))
+        {
+          values.push_back (std::stoi (item));
         }
-        return values;
+    }
+  return values;
 }
