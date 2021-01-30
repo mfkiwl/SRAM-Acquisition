@@ -1,8 +1,3 @@
-project('SRAM Recovery Station',
-        'cpp',
-        default_options : ['warning_level=2'],
-        version: '0.1')
-
 inc_dir = include_directories('include')
 
 boost_dep = dependency('boost')
@@ -14,6 +9,7 @@ served_dep = dependency('served')
 src_files = [
   'include/influxdb.hpp',
   'include/packet.hpp',
+  'src/packet.cpp',
   'include/device_manager.hpp',
   'src/device_manager.cpp',
   'include/db_manager.hpp',

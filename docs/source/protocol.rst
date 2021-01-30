@@ -1,0 +1,4 @@
+.. _protocol:
+
+Communication protocol
+======================

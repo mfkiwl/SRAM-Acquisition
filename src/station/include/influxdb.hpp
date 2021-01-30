@@ -465,9 +465,13 @@ inner::http_request (const char *method, const char *uri,
         _ ('n')
         _ ('c')
         _ ('o')
-        _ ('d') _ ('i') _ ('n') _ ('g') _ (':') _ (' ') _ ('c') _ ('h') _ ('u')
-            _ ('n') _ ('k') _ ('e') _ ('d') chunked
-            = 1;
+        _ ('d')
+        _ ('i')
+        _ ('n')
+        _ ('g')
+        _ (':')
+        _ (' ')
+        _ ('c') _ ('h') _ ('u') _ ('n') _ ('k') _ ('e') _ ('d') chunked = 1;
         break;
       case '\r':
         __ ('\n')

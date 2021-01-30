@@ -27,12 +27,10 @@ DeviceManager::power_off ()
   std::system ("ykushcmd -d a");
 }
 
-/// Register the connected ports
-///
-/// TODO: Add implementation for Windows
-/// https://stackoverflow.com/questions/2674048/what-is-proper-way-to-detect-all-available-serial-ports-on-windows
-///
-/// TODO: Read the config values from an external file
+// TODO: Add implementation for Windows
+// https://stackoverflow.com/questions/2674048/what-is-proper-way-to-detect-all-available-serial-ports-on-windows
+//
+// TODO: Read the config values from an external file
 void
 DeviceManager::register_ports ()
 {
@@ -60,8 +58,6 @@ DeviceManager::register_ports ()
     }
 }
 
-/// Names of ports registered at the moment
-/// Only the device name is returned and not the full path
 std::vector<std::string>
 DeviceManager::available_ports ()
 {
@@ -73,7 +69,6 @@ DeviceManager::available_ports ()
   return ports;
 }
 
-/// Port name and status of the devices in that port
 DeviceMap
 DeviceManager::device_map ()
 {
@@ -82,8 +77,6 @@ DeviceManager::device_map ()
 
 /// Send a header to all ports in a blocking way
 /// TODO: Add error handling
-/// @param buf buffer to send
-/// @param len number of bytes to send
 void
 DeviceManager::broadcast_blocking (const uint8_t *buf, const int &len)
 {
@@ -163,7 +156,7 @@ DeviceManager::register_devices ()
     .bid_low = 0,
   };
 
-  auto header_ser = new uint8_t[sizeof (header_t)];
+  uint8_t *header_ser = new uint8_t[sizeof (header_t)];
   memcpy (header_ser, &ping_header, sizeof (header_t));
   this->broadcast_blocking (header_ser, sizeof (header_t));
   delete header_ser;

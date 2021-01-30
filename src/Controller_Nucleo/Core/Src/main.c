@@ -158,10 +158,10 @@ int main(void)
 	  if (num_bytes_up == 15) {
 		  	num_bytes_up = 0;
 	  		next_state = Read_Header_State;
-	  } else if (num_bytes_up == 528) {
+	  } else if (num_bytes_up == MAX_BUFFER_SIZE) {
 		  num_bytes_up = 0;
 		  next_state = Read_Region_State;
-	  } else if(waiting_read_down == 1 && num_bytes_down == 528) {
+	  } else if(waiting_read_down == 1 && num_bytes_down == MAX_BUFFER_SIZE) {
 		  waiting_read_down = 0;
 		  next_state = Transport_State;
 	  } else if (num_bytes_down == 15) {

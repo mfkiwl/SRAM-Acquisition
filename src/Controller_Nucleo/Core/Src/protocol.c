@@ -63,9 +63,6 @@ uint8_t parse_body(uint8_t *buffer, body_t *body) {
 	body->bid_medium = (buffer[9] << 24) + (buffer[8] << 16) + (buffer[7] << 8) + (buffer[6]);
 	body->bid_low = (buffer[13] << 24) + (buffer[12] << 16) + (buffer[11] << 8) + (buffer[10]);
 
-
-
-
 	switch (body->type) {
 	case MEMORY:
                 body->mem_address = (buffer[15] << 8) + (buffer[14]);
@@ -141,11 +138,12 @@ void transmit_body(UART_HandleTypeDef *huart, body_t *body) {
 	HAL_UART_Transmit(huart, (uint8_t *)&body->mem_address, 2, TIMEOUT_TX);
 
 	uint8_t *mem = (uint8_t *)0x20000000;
+	uint32_t address = body->mem_address * 512;
 
 	switch(body->type) {
 		case MEMORY:
 			for(int i = 0; i < 512; i++) {
-				HAL_UART_Transmit(huart, (uint8_t *)(mem + body->mem_address + i), 1, TIMEOUT_TX);
+				HAL_UART_Transmit(huart, (uint8_t *)(mem + address + i), 1, TIMEOUT_TX);
 			}
 			break;
 		case SENSORS:
@@ -169,9 +167,10 @@ void transmit_body(UART_HandleTypeDef *huart, body_t *body) {
 void write_mem_values(body_t *body) {
 
         uint8_t *mem = (uint8_t *)0x20000000;
+        uint32_t address = body->mem_address * 512;
 
         for(int i = 0; i < 512; i++) {
-                *(mem + body->mem_address + i) = body->data[i];
+                *(mem + address + i) = body->data[i];
         }
 }
 
@@ -204,7 +203,7 @@ SystemState header_handler(header_t *header) {
 			header->bid_low = get_bid_low();
 	    	transmit_ACK(header);
 
-	    	HAL_Delay(800);
+	    	HAL_Delay(1000);
 
 	    	header->type = PING;
 	    	header->bid_high = 0;
@@ -241,7 +240,7 @@ SystemState header_handler(header_t *header) {
 		// Reply to packet
 		if(header->bid_high == get_bid_high() && header->bid_medium == get_bid_medium() && header->bid_low == get_bid_low() ) {
 			transmit_ACK(header);
-			HAL_Delay(800);
+			HAL_Delay(1000);
 
 			waiting_read_down = 0;
 			return Read_Region_State;
@@ -267,7 +266,7 @@ SystemState header_handler(header_t *header) {
 		// Reply to packet
 		if(header->bid_high == get_bid_high() && header->bid_medium == get_bid_medium() && header->bid_low == get_bid_low() ) {
 			transmit_ACK(header);
-			HAL_Delay(800);
+			HAL_Delay(1000);
 
 			waiting_read_down = 0;
 			return Read_Region_State;

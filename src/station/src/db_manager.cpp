@@ -20,8 +20,6 @@ std::map<uint8_t, std::string> packet_name
         { (uint8_t)body_type::SENSORS, "SENSORS" },
         { (uint8_t)body_type::CODE, "CODE" } };
 
-/// Default constructor
-/// TODO: Read config values from file
 DBManager::DBManager ()
 {
   this->client_uri = mongocxx::uri ("mongodb://localhost:27017");
@@ -29,15 +27,12 @@ DBManager::DBManager ()
   this->db = client["SRAM"];
 }
 
-/// Parametrized constructor
 DBManager::DBManager (const std::string &uri, const std::string &db_name)
 {
   this->client_uri = mongocxx::uri (uri);
   this->client = mongocxx::client (client_uri);
   this->db = client[db_name];
 }
-
-/// mongocxx::client does not provide a way to close the connection directly.
 
 std::vector<uint8_t>
 invert_bytes_arr (std::vector<uint8_t> &bytes)
@@ -50,8 +45,6 @@ invert_bytes_arr (std::vector<uint8_t> &bytes)
   return inverted;
 }
 
-/// Convert a header into a document
-/// Every header has the same size
 bson_doc
 DBManager::header_to_doc (const header_t &header)
 {
@@ -65,15 +58,12 @@ DBManager::header_to_doc (const header_t &header)
   doc.append (kvp ("header_type", packet_name[header.type]));
   doc.append (kvp ("CRC", header.CRC));
   doc.append (kvp ("TTL", header.TTL));
-
   doc.append (kvp ("board_id", bid));
-  doc.append (kvp ("creation_time", date));
+  doc.append (kvp ("timestamp", date));
 
   return doc;
 }
 
-/// Convert a body into a document
-/// The data gets converted into a string with comma separated values
 bson_doc
 DBManager::body_to_doc (const body_t &body)
 {
@@ -84,25 +74,26 @@ DBManager::body_to_doc (const body_t &body)
                                  body.bid_medium, body.bid_low);
 
   auto date = bsoncxx::types::b_date (std::chrono::system_clock::now ());
+  auto mem_address
+      = fmt::format ("0x{:08x}", body.address_offset * PAYLOAD_SIZE);
 
-  doc.append (kvp ("body_type", packet_name[body.type]));
+  doc.append (kvp ("packet_type", packet_name[body.type]));
   doc.append (kvp ("CRC", body.CRC));
   doc.append (kvp ("board_id", bid));
-  doc.append (kvp ("creation_time", date));
-  doc.append (kvp ("mem_address", fmt::format ("0x{:08x}", body.mem_address)));
+  doc.append (kvp ("timestamp", date));
+  doc.append (kvp ("mem_address", mem_address));
 
   std::stringstream data_ss;
 
   for (int byte = 0; byte < 511; ++byte)
-    data_ss << byte << ",";
-  data_ss << body.data[512];
+    data_ss << (int)body.data[byte] << ",";
+  data_ss << (int)body.data[511];
 
   doc.append (kvp ("data", data_ss.str ()));
 
   return doc;
 }
 
-/// Insert one sample into the collection
 MaybeResult
 DBManager::insert_one (const bson_doc &doc, const std::string &coll_name)
 {
@@ -113,9 +104,6 @@ DBManager::insert_one (const bson_doc &doc, const std::string &coll_name)
   return result;
 }
 
-/// Returns true if the reference document exists in the db
-/// The reference sample is the first sample that is taken from each board
-/// Both board_id and mem_address are hex strings
 bool
 DBManager::reference_present (const std::string &board_id,
                               const std::string &mem_address)
@@ -125,9 +113,6 @@ DBManager::reference_present (const std::string &board_id,
   return std::distance (cursor.begin (), cursor.end ()) > 0;
 }
 
-/// Obtain the data from a sample in a vector
-/// As the data is stored in a comma separated string to preserve space,
-/// we need to convert it into a number vector
 std::vector<uint8_t>
 DBManager::get_data_vector (const std::string &board_id,
                             const std::string &mem_address)
